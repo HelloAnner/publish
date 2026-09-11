@@ -1,5 +1,57 @@
+# ── 依赖 ────────────────────────────────────────────────
 node_modules/
+.pnp
+.pnp.js
+.yarn/
+
+# ── 构建产物 ────────────────────────────────────────────
 dist/
-*.log
-.DS_Store
+build/
+out/
+*.tsbuildinfo
+
+# ── 本地配置与凭据 ──────────────────────────────────────
+# 本工具本身不保存任何平台凭据（复用浏览器登录态），
+# 但本地配置与历史里可能有你的账号信息，不要提交。
+.env
+.env.*
+!.env.example
+.publishrc.local.json
+publish.config.local.json
+*.secret.json
+
+# ── 运行期产物 ──────────────────────────────────────────
+# 封面缓存 / 探索报告 / 发布历史（默认都在 ~/.cache 与 ~/.local，这里兜底）
+.covers/
+.explore/
+history.jsonl
 .publish-local/
+
+# ── 日志与临时文件 ──────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-error.log*
+bun-debug.log*
+logs/
+tmp/
+.tmp/
+*.tmp
+*.bak
+*.bak.*
+
+# ── 测试与覆盖率 ────────────────────────────────────────
+coverage/
+.nyc_output/
+*.lcov
+__snapshots__/*.ambr
+
+# ── 编辑器 / 操作系统 ───────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+*.swp
+*.swo
+*~

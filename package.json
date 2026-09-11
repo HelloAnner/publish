@@ -27,8 +27,22 @@
     "cli",
     "bun"
   ],
+  "author": "Anner (https://github.com/HelloAnner)",
   "license": "MIT",
-  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HelloAnner/publish.git"
+  },
+  "homepage": "https://github.com/HelloAnner/publish#readme",
+  "bugs": {
+    "url": "https://github.com/HelloAnner/publish/issues"
+  },
+  "files": [
+    "src",
+    "Makefile",
+    "README.md",
+    "LICENSE"
+  ],
   "devDependencies": {
     "@types/bun": "^1.3.0",
     "typescript": "^5.9.0"
