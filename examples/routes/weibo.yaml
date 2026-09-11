@@ -1,0 +1,30 @@
+# 示例 route：微博
+# 复制到 ~/.config/publish/routes/weibo.yaml 后：
+#   publish routes validate
+#   publish explore https://weibo.com/compose        # 先确认真实的元素定位
+#   publish -c "我的观点" -to weibo --dry-run
+#   publish -c "我的观点" -to weibo
+#
+# 注意：下面的选择器是起始模板，请用 publish explore 的 state 输出校对后再发布。
+id: weibo
+name: 微博
+site: weibo
+session: publish-weibo
+capabilities:
+  text: true
+  images: 9
+  requiresImage: false
+  title: false
+  maxTextLength: 2000
+  lengthMode: chars
+  topics: true
+  draft: false
+steps:
+  - open: "https://weibo.com/compose"
+  - wait: { selector: "[contenteditable='true']", timeout: 25000 }
+  - pause: [1200, 3200]
+  - type: { target: "[contenteditable='true']", text: "{{content}}" }
+  - pause: [700, 2000]
+  - click: { target: "text=发送" }
+  - expect: { text: "发送成功" }
+captureUrl: true

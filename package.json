@@ -1,0 +1,36 @@
+{
+  "name": "publish",
+  "version": "0.1.0",
+  "description": "一键把观点发布到 小红书 / X / 知乎 及任意站点 —— 基于 opencli 浏览器桥，内置人类化随机延迟与风控护栏",
+  "type": "module",
+  "module": "src/index.ts",
+  "bin": {
+    "publish": "./src/index.ts",
+    "pub": "./src/index.ts"
+  },
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "test": "bun test",
+    "test:watch": "bun test --watch",
+    "typecheck": "tsc --noEmit",
+    "link": "bun link"
+  },
+  "engines": {
+    "bun": ">=1.1.0"
+  },
+  "keywords": [
+    "opencli",
+    "publish",
+    "xiaohongshu",
+    "twitter",
+    "zhihu",
+    "cli",
+    "bun"
+  ],
+  "license": "MIT",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "^1.3.0",
+    "typescript": "^5.9.0"
+  }
+}
