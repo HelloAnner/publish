@@ -1,5 +1,6 @@
 /** 内置平台 + 用户 route 的注册装配。 */
 
+import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { userRouteDir } from "../core/paths.ts";
@@ -10,7 +11,14 @@ import { createZhihuAdapter } from "./zhihu.ts";
 import { createRouteAdapter, loadRoutes, type RouteDefinition } from "./route.ts";
 
 export function builtinRouteDirs(): string[] {
-  const here = dirname(fileURLToPath(import.meta.url));
+  // 通过 ~/.local/bin 的符号链接调用时，import.meta.url 可能是链接路径，
+  // realpath 之后才能找到仓库里的 src/routes。
+  let here = dirname(fileURLToPath(import.meta.url));
+  try {
+    here = dirname(realpathSync(fileURLToPath(import.meta.url)));
+  } catch {
+    /* 保留原值 */
+  }
   return [join(here, "..", "routes"), userRouteDir()];
 }
 

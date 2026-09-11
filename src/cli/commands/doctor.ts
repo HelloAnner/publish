@@ -1,5 +1,9 @@
 /** doctor：体检。 */
 
+import { existsSync, realpathSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { callOpencli } from "../../core/opencli.ts";
 import { EXIT } from "../../core/errors.ts";
 import { configDir, coverCacheDir, globalConfigFile, historyFile, userRouteDir } from "../../core/paths.ts";
@@ -11,6 +15,14 @@ interface Check {
   name: string;
   ok: boolean | "warn";
   detail: string;
+}
+
+function realpathSafe(path: string): string {
+  try {
+    return realpathSync(path);
+  } catch {
+    return path;
+  }
 }
 
 export async function runDoctor(ctx: CliContext): Promise<number> {
@@ -66,6 +78,22 @@ export async function runDoctor(ctx: CliContext): Promise<number> {
   const history = await readHistory(ctx.historyPath);
   const today = history.filter((e) => e.ok && !e.dryRun && localDay(new Date(e.ts)) === localDay()).length;
   checks.push({ name: "本地历史", ok: true, detail: `${history.length} 条记录，今日 ${today} 次（${historyFile()}）` });
+
+  // 注意：import.meta.url 是「当前模块」的路径，这里要的是入口脚本路径
+  const entryPath = (Bun as unknown as { main?: string }).main ?? process.argv[1] ?? "";
+  const entry = realpathSafe(entryPath);
+  const installed = [join(homedir(), ".local", "bin", "publish"), join(homedir(), ".bun", "bin", "publish")]
+    .filter((p) => existsSync(p))
+    .map((p) => {
+      const real = realpathSafe(p);
+      const shown = p.startsWith(homedir()) ? "~" + p.slice(homedir().length) : p;
+      return real === entry ? shown + " ← 本项目" : shown + " → " + real;
+    });
+  checks.push({
+    name: "CLI 安装",
+    ok: installed.some((i) => i.includes("本项目")) ? true : "warn",
+    detail: installed.length > 0 ? installed.join("  ") : "未安装到 ~/.local/bin，运行 make install",
+  });
 
   checks.push({
     name: "配置文件",

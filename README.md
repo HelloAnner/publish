@@ -16,10 +16,29 @@ publish -c "同一条观点" -to x,xhs,zhihu --yes
 
 ```bash
 cd ~/publish
-bun install
-bun link          # 把 publish 链接到全局，之后任意目录都能用
-publish --version
+make install      # 装到 ~/.local/bin/publish（同时提供简写 pub）
+make smoke        # 校验：版本号 + dry-run，不会真的发布
 ```
+
+`make install` 把 `~/.local/bin/publish`、`~/.local/bin/pub` 链接到本仓库的 `src/index.ts`（带 `#!/usr/bin/env bun`），
+所以改完代码立即生效，不需要重新安装。如果 `~/.local/bin` 不在 PATH 里，它会直接打印需要追加的那一行；
+遇到同名文件会先备份成 `*.bak.<时间戳>`，不会直接覆盖。
+
+```bash
+make help                          # 全部可用目标
+make install PREFIX=/usr/local     # 换安装前缀（可能需要 sudo）
+make uninstall                     # 只删指向本项目的链接
+make check                         # 类型检查 + 单元测试
+```
+
+也可以用 bun 自带的全局链接（二选一）：
+
+```bash
+bun install && make link           # 装到 ~/.bun/bin
+make unlink                        # 需要时移除
+```
+
+`publish doctor` 会告诉你当前 `publish` 究竟装在哪里。
 
 依赖前提：
 
