@@ -39,6 +39,7 @@ export const FLAGS: FlagDef[] = [
   { name: "no-delay", type: "boolean", group: "节奏与风控", help: "跳过所有随机等待（慎用，风控风险高）" },
   { name: "draft", type: "boolean", group: "节奏与风控", help: "存草稿而不直接发布（小红书支持）" },
   { name: "thread", type: "boolean", group: "节奏与风控", help: "X 超长时自动拆成串（thread）" },
+  { name: "xhs-longform", type: "string", metavar: "<off|cards|auto>", group: "节奏与风控", help: "小红书超 1000 字时：off 报错(默认) / cards 切成最多 9 张文字卡片 / auto 自动选择" },
   { name: "allow-truncate", type: "boolean", group: "节奏与风控", help: "允许自动截断超限文案（默认只告警不截断）" },
   { name: "seed", type: "number", metavar: "<n>", group: "节奏与风控", help: "随机种子，便于复现等待节奏" },
 

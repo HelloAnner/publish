@@ -77,11 +77,15 @@ export interface PublishOutcome {
   raw?: unknown;
 }
 
+/** 小红书长内容策略：off=超长报错；cards=切成文字卡片；auto=超长自动切卡片 */
+export type XhsLongform = "off" | "cards" | "auto";
+
 export interface PublishRunOptions {
   thread: boolean;
   draft: boolean;
   allowTruncate: boolean;
   force: boolean;
+  longform: XhsLongform;
 }
 
 export interface ExecResult {

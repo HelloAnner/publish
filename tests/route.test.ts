@@ -43,7 +43,7 @@ function runCtx(run = fakeRunner().run): RunContext {
     ui,
     dryRun: false,
     run,
-    options: { thread: false, draft: false, allowTruncate: false, force: false },
+    options: { thread: false, draft: false, allowTruncate: false, force: false, longform: "off" },
   };
 }
 

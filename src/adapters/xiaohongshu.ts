@@ -10,7 +10,7 @@ import type {
   Post,
   RunContext,
 } from "../core/types.ts";
-import { inspectImageSizes, limitImages, textLength, truncateTo } from "./helpers.ts";
+import { inspectImageSizes, limitImages, splitByWeight, textLength, truncateTo } from "./helpers.ts";
 
 const CAPS: PlatformCapabilities = {
   text: true,
@@ -35,6 +35,29 @@ export function deriveTitle(post: Post): string {
     .map((l) => l.trim())
     .find((l) => l.length > 0);
   return (first ?? "").replace(/^#+\s*/, "");
+}
+
+/** 单张文字卡片建议承载的字符数。 */
+const CARD_CHARS = 420;
+/** 小红书图文笔记最多 9 张图，文字卡片同理。 */
+const MAX_CARDS = 9;
+
+/**
+ * 把长正文切成最多 9 张文字卡片（对应 opencli 的 --card-text，多张用 ||| 分隔）。
+ * 超出容量时保留前 8 张 + 截断的收尾，并在调用方给出告警。
+ */
+export function splitIntoCards(text: string, perCard = CARD_CHARS, maxCards = MAX_CARDS): string[] {
+  const chunks = splitByWeight(text, perCard, (s) => [...s].length).filter((c) => c.trim());
+  if (chunks.length <= maxCards) return chunks;
+  const head = chunks.slice(0, maxCards - 1);
+  const tail = chunks.slice(maxCards - 1).join("");
+  head.push(truncateTo(tail, perCard));
+  return head;
+}
+
+/** 卡片文本里的换行要写成字面量 \n（opencli 的约定），多张卡片用 ||| 分隔。 */
+export function joinCardText(cards: string[]): string {
+  return cards.map((c) => c.replace(/\n/g, "\\n")).join("|||");
 }
 
 export function buildPublishArgs(o: {
@@ -85,12 +108,32 @@ export function createXiaohongshuAdapter(): PlatformAdapter {
 
       let body = post.body.trim();
       const bodyLen = textLength(body, CAPS);
-      if (bodyLen > MAX_BODY) {
+      const longform = ctx.options.longform ?? "off";
+      const useCards = longform === "cards" || (longform === "auto" && bodyLen > MAX_BODY);
+
+      let cards: string[] = [];
+      if (useCards) {
+        cards = splitIntoCards(body);
+        const total = splitIntoCards(post.body.trim()).length;
+        if (total > MAX_CARDS) {
+          warnings.push(`正文 ${bodyLen} 字需要 ${total} 张卡片，超过 9 张上限，结尾已截断`);
+        }
+        notes.push(`正文切成 ${cards.length} 张文字卡片`);
+        if (bodyLen > MAX_BODY) {
+          warnings.push(`笔记正文 ${bodyLen} 字超过 ${MAX_BODY} 字，已截断；完整内容在卡片图里`);
+          body = truncateTo(body, MAX_BODY);
+        }
+      } else if (bodyLen > MAX_BODY) {
         if (ctx.options.allowTruncate || ctx.options.force) {
           warnings.push(`正文 ${bodyLen} 字，超过 ${MAX_BODY} 字，已截断`);
           body = truncateTo(body, MAX_BODY);
         } else {
-          errors.push(`正文 ${bodyLen} 字，超过小红书 ${MAX_BODY} 字上限（加 --allow-truncate 可自动截断）`);
+          errors.push(
+            `正文 ${bodyLen} 字，超过小红书图文笔记 ${MAX_BODY} 字上限。\n` +
+              "  · 加 --xhs-longform cards：把全文切成最多 9 张文字卡片一起发\n" +
+              `  · 加 --allow-truncate：截断到 ${MAX_BODY} 字（会丢失结尾）\n` +
+              "  · 小红书「写长文」入口目前无法自动化（opencli 访问 target=article 会被重定向到登录页）",
+          );
         }
       }
 
@@ -108,7 +151,7 @@ export function createXiaohongshuAdapter(): PlatformAdapter {
         images,
         topics,
         draft,
-        cardText: title || truncateTo(body, MAX_TITLE),
+        cardText: cards.length > 0 ? joinCardText(cards) : title || truncateTo(body, MAX_TITLE),
         cardStyle: ctx.config.cover.cardStyle,
       });
 

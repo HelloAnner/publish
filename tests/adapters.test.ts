@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { createTwitterAdapter } from "../src/adapters/twitter.ts";
-import { buildPublishArgs, createXiaohongshuAdapter, deriveTitle } from "../src/adapters/xiaohongshu.ts";
+import { buildPublishArgs, createXiaohongshuAdapter, deriveTitle, joinCardText, splitIntoCards } from "../src/adapters/xiaohongshu.ts";
 import { createZhihuAdapter, extractQuestionId, findQuestion, toZhihuPayload } from "../src/adapters/zhihu.ts";
 import type { Post, PrepareContext, PublishRunOptions, RunContext } from "../src/core/types.ts";
 import { UI } from "../src/core/ui.ts";
@@ -18,7 +18,7 @@ function ctx(run = fakeRunner().run, options: Partial<PublishRunOptions> = {}): 
     ui,
     dryRun: false,
     run,
-    options: { thread: false, draft: false, allowTruncate: false, force: false, ...options },
+    options: { thread: false, draft: false, allowTruncate: false, force: false, longform: "off", ...options } as PublishRunOptions,
   };
 }
 
@@ -124,6 +124,47 @@ describe("小红书适配器", () => {
     const joined = prepared.args.join(" ");
     expect(joined).toContain("--card-style 科技");
     expect(joined).not.toContain("纸感");
+  });
+
+  test("超长正文 + --xhs-longform cards 会切成多张文字卡片", async () => {
+    const body = "这是段落。".repeat(400); // 2000 字
+    const prepared = await createXiaohongshuAdapter().prepare(
+      post({ title: "标题", body }),
+      ctx(fakeRunner().run, { longform: "cards" }),
+    );
+    expect(prepared.errors).toHaveLength(0);
+    const joined = prepared.args.join(" ");
+    expect(joined).toContain("--card-text");
+    expect(joined).toContain("|||");
+    expect(prepared.notes.join()).toContain("文字卡片");
+    expect([...prepared.text].length).toBeLessThanOrEqual(1000);
+  });
+
+  test("默认超长仍报错，并给出三条出路", async () => {
+    const prepared = await createXiaohongshuAdapter().prepare(post({ title: "标题", body: "字".repeat(1200) }), ctx());
+    expect(prepared.errors).toHaveLength(1);
+    expect(prepared.errors[0]).toContain("--xhs-longform cards");
+    expect(prepared.errors[0]).toContain("--allow-truncate");
+    expect(prepared.errors[0]).toContain("写长文");
+  });
+
+  test("splitIntoCards 卡在 9 张以内，换行转义为字面量", () => {
+    const cards = splitIntoCards("很长的一段话。".repeat(2000));
+    expect(cards.length).toBeLessThanOrEqual(9);
+    expect(cards.length).toBeGreaterThan(1);
+    const joined = joinCardText(["第一行\n第二行", "第二张"]);
+    expect(joined).toBe("第一行\\n第二行|||第二张");
+  });
+
+  test("auto 模式只在超长时才切卡片", async () => {
+    const adapter = createXiaohongshuAdapter();
+    const short = await adapter.prepare(post({ title: "标题", body: "短正文" }), ctx(fakeRunner().run, { longform: "auto" }));
+    expect(short.args.join(" ")).not.toContain("|||");
+    const long = await adapter.prepare(
+      post({ title: "标题", body: "这是段落。".repeat(400) }),
+      ctx(fakeRunner().run, { longform: "auto" }),
+    );
+    expect(long.args.join(" ")).toContain("|||");
   });
 
   test("没有标题会报错", async () => {

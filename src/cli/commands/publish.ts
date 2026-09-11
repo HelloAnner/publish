@@ -9,9 +9,10 @@ import { appendHistory, evaluateGuard, readHistory } from "../../core/risk.ts";
 import { generateCover } from "../../core/cover.ts";
 import { callOpencli, decorateForDisplay } from "../../core/opencli.ts";
 import { AuthRequiredError, EXIT, GuardError, PublishError, UsageError } from "../../core/errors.ts";
-import type { AuthState, PlatformAdapter, Post, PreparedPublish, RunContext } from "../../core/types.ts";
+import type { AuthState, PlatformAdapter, Post, PreparedPublish, RunContext, XhsLongform } from "../../core/types.ts";
 import { confirm } from "../../core/ui.ts";
 import { truncateDisplay } from "../../core/util.ts";
+import { textLength } from "../../adapters/helpers.ts";
 import type { CliContext } from "../context.ts";
 
 interface Step {
@@ -97,7 +98,13 @@ export async function runPublish(ctx: CliContext): Promise<number> {
         ui,
         dryRun: ctx.dryRun,
         run: ctx.run,
-        options: { thread: flags.bool("thread"), draft: flags.bool("draft") || config.defaults.draft, allowTruncate: flags.bool("allow-truncate"), force: ctx.force },
+        options: {
+          thread: flags.bool("thread"),
+          draft: flags.bool("draft") || config.defaults.draft,
+          allowTruncate: flags.bool("allow-truncate"),
+          force: ctx.force,
+          longform: readLongform(flags.str("xhs-longform")),
+        },
       });
       for (const w of prepared.warnings) ui.warn(`[${adapter.id}] ${w}`);
       for (const e of prepared.errors) planErrors.push(`[${adapter.id}] ${post.source} → ${e}`);
@@ -154,7 +161,7 @@ export async function runPublish(ctx: CliContext): Promise<number> {
     steps.forEach((s, i) => {
       ui.info(`  ${i + 1}. [${s.adapter.id}] ${s.post.source}`);
       for (const args of s.prepared.plan) {
-        const display = decorateForDisplay(args, config.opencli.window).join(" ");
+        const display = displayArgs(decorateForDisplay(args, config.opencli.window)).join(" ");
         ui.info("     " + ui.dim(args[0]?.startsWith("#") ? display : "opencli " + display));
       }
     });
@@ -189,7 +196,13 @@ export async function runPublish(ctx: CliContext): Promise<number> {
     ui,
     dryRun: false,
     run: ctx.run,
-    options: { thread: flags.bool("thread"), draft: flags.bool("draft") || config.defaults.draft, allowTruncate: flags.bool("allow-truncate"), force: ctx.force },
+    options: {
+      thread: flags.bool("thread"),
+      draft: flags.bool("draft") || config.defaults.draft,
+      allowTruncate: flags.bool("allow-truncate"),
+      force: ctx.force,
+      longform: readLongform(flags.str("xhs-longform")),
+    },
     signal: controller.signal,
   };
 
@@ -259,6 +272,19 @@ export async function runPublish(ctx: CliContext): Promise<number> {
   return EXIT.partial;
 }
 
+/** 预览用：把超长参数（例如几千字的 --card-text）折叠成可读形式。 */
+function displayArgs(args: string[]): string[] {
+  return args.map((a) => {
+    const chars = [...a];
+    if (chars.length <= 140) return a;
+    return chars.slice(0, 56).join("") + `…(共 ${chars.length} 字)`;
+  });
+}
+
+function readLongform(value: string | undefined): XhsLongform {
+  return value === "cards" || value === "auto" ? value : "off";
+}
+
 function describeStep(step: Step, window: string) {
   return {
     platform: step.adapter.id,
@@ -266,7 +292,7 @@ function describeStep(step: Step, window: string) {
     title: step.prepared.title,
     textLength: [...step.prepared.text].length,
     images: step.prepared.images.length,
-    commands: step.prepared.plan.map((a) => ["opencli", ...decorateForDisplay(a, window)].join(" ")),
+    commands: step.prepared.plan.map((a) => ["opencli", ...displayArgs(decorateForDisplay(a, window))].join(" ")),
     notes: step.prepared.notes,
   };
 }
@@ -277,7 +303,7 @@ async function checkAuth(adapter: PlatformAdapter, ctx: CliContext): Promise<Aut
     ui: ctx.ui,
     dryRun: ctx.dryRun,
     run: ctx.run,
-    options: { thread: false, draft: false, allowTruncate: false, force: ctx.force },
+    options: { thread: false, draft: false, allowTruncate: false, force: ctx.force, longform: "off" },
   };
   if (adapter.checkAuth) return adapter.checkAuth(runCtx);
   if (!adapter.site) return { loggedIn: true, detail: "自定义 route（跳过登录检查）" };
@@ -302,8 +328,18 @@ async function ensureCovers(ctx: CliContext, posts: Post[], adapters: PlatformAd
   const needsImage = adapters.some((a) => a.capabilities.images > 0);
   if (!needsImage) return;
 
+  // 小红书走文字卡片时，卡片本身就是图片，不需要再生成封面
+  const longform = flags.str("xhs-longform") ?? "off";
+  const xhsSelected = adapters.some((a) => a.id === "xiaohongshu");
+  const useCards = (post: Post) =>
+    xhsSelected && (longform === "cards" || (longform === "auto" && textLength(post.body, { lengthMode: "chars" }) > 1000));
+
   for (const post of posts) {
     if (post.images.length > 0) continue;
+    if (useCards(post)) {
+      ui.detail("走文字卡片模式，跳过封面生成");
+      continue;
+    }
     if (coverFlag !== "auto") {
       post.images = [isAbsolute(coverFlag) ? coverFlag : resolve(ctx.cwd, coverFlag)];
       continue;
