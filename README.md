@@ -406,7 +406,8 @@ captureUrl: true                      # 结束后把 location.href 记为发布�
 `check` `uncheck` `upload` `drag` `wait` `eval` `state` `find` `get` `extract` `frames` `screenshot`
 `pause` `expect`。每个动作会被翻译成对应的 `opencli browser <session> <cmd>` 调用。
 
-> `target` 需要是 **CSS 选择器**或 `state` 快照里的 `[N]` 引用编号，不支持 `text=发送` 这类语义写法。
+> `target` 需要是 **CSS 选择器**或 `state` 快照里的 `[N]` 引用编号，不支持 `text=发送` 这类语义写法——
+> 写错时 `publish routes validate` 与发布前的校验都会直接拦下并给出修正提示。
 
 ### 探索一个陌生站点
 

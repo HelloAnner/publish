@@ -86,6 +86,27 @@ const BROWSER_STEP_KEYS = new Set([
 
 export class RouteError extends Error {}
 
+/**
+ * opencli 的 click/fill 只接受 CSS 选择器或 state 快照里的 [N] 编号，
+ * 不接受 text=/role=/label= 这类语义定位（会直接报 invalid_selector）。
+ * 这里提前拦下，避免用户跑到浏览器里才看到难懂的报错。
+ */
+const SEMANTIC_LOCATOR = /^(text|role|label|testid|placeholder|aria|name)\s*=/i;
+
+export function assertTargetSyntax(target: string, where: string): void {
+  const value = target.trim();
+  if (!value) return;
+  // 含模板变量的目标只能在运行时判断
+  if (value.includes("{{")) return;
+  if (SEMANTIC_LOCATOR.test(value)) {
+    throw new RouteError(
+      `${where} 的 target "${value}" 用了语义定位。` +
+        'opencli 只接受 CSS 选择器（如 button.submit、[placeholder*="标题"]）或 state 快照里的编号（如 "3"）。' +
+        " 提示：先用 publish explore <url> 拿到元素编号，再填到这里。",
+    );
+  }
+}
+
 function requireString(value: unknown, what: string): string {
   if (typeof value === "string" && value.trim()) return value;
   if (typeof value === "number") return String(value);
@@ -133,6 +154,17 @@ function validateStep(step: unknown, index: number, path: string): void {
   if (key === "pause" || key === "expect") return;
   if (!BROWSER_STEP_KEYS.has(key)) {
     throw new RouteError(`${path} 第 ${index + 1} 个 step 用了未知动作 "${key}"`);
+  }
+  // 静态检查 target 语法，别等跑到浏览器才发现
+  const where = `${path} 第 ${index + 1} 个 step`;
+  const value = (step as Record<string, unknown>)[key];
+  const asRec = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
+  if (["click", "hover", "focus", "dblclick", "check", "uncheck"].includes(key) && typeof value === "string") {
+    assertTargetSyntax(value, where);
+  }
+  if (["click", "hover", "focus", "dblclick", "check", "uncheck", "type", "fill", "select", "upload"].includes(key)) {
+    const t = asRec(value).target;
+    if (typeof t === "string") assertTargetSyntax(t, where);
   }
 }
 
@@ -227,6 +259,7 @@ export function stepToAction(step: RouteStep, session: string, vars: Record<stri
     case "check":
     case "uncheck": {
       const target = typeof raw === "string" ? raw : requireString(asRecord(raw).target, key + ".target");
+      assertTargetSyntax(target, key);
       const r = asRecord(raw);
       return { kind: "browser", args: [...base, key, target, ...flag(r, "timeout")] };
     }
@@ -234,6 +267,7 @@ export function stepToAction(step: RouteStep, session: string, vars: Record<stri
     case "fill": {
       const r = asRecord(raw);
       const target = requireString(r.target, key + ".target");
+      assertTargetSyntax(target, key);
       const text = typeof r.text === "string" ? r.text : "";
       return { kind: "browser", args: [...base, key, target, text, ...flag(r, "timeout")] };
     }
@@ -245,9 +279,11 @@ export function stepToAction(step: RouteStep, session: string, vars: Record<stri
     }
     case "select": {
       const r = asRecord(raw);
+      const target = requireString(r.target, "select.target");
+      assertTargetSyntax(target, "select");
       return {
         kind: "browser",
-        args: [...base, "select", requireString(r.target, "select.target"), requireString(r.option, "select.option")],
+        args: [...base, "select", target, requireString(r.option, "select.option")],
       };
     }
     case "upload": {

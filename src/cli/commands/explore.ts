@@ -27,10 +27,19 @@ function slugify(url: string): string {
 /** 解析 \`opencli browser <s> state\` 的文字输出：[1]<a href=x>text</a> */
 export function parseStateElements(text: string): StateElement[] {
   const out: StateElement[] = [];
+  // 成对标签：[1]<a href=x>Learn more</a>
+  const paired = /^\s*\[(\d+)\]<([a-zA-Z0-9-]+)((?:\s[^>]*?)?)>(.*?)<\/\2>\s*$/;
+  // 空元素：[3]<input placeholder=标题 />
+  const voided = /^\s*\[(\d+)\]<([a-zA-Z0-9-]+)((?:\s[^>]*?)?)\s*\/?>\s*$/;
   for (const line of text.split("\n")) {
-    const m = /^\s*\[(\d+)\]<([a-zA-Z0-9-]+)((?:\s[^>]*)?)>(.*?)<\/\2>\s*$/.exec(line);
+    const m = paired.exec(line) ?? voided.exec(line);
     if (!m) continue;
-    out.push({ index: Number(m[1]), tag: m[2]!, attrs: m[3]!.trim(), text: m[4]!.trim() });
+    out.push({
+      index: Number(m[1]),
+      tag: m[2]!,
+      attrs: (m[3] ?? "").trim().replace(/\/$/, "").trim(),
+      text: (m[4] ?? "").trim(),
+    });
   }
   return out;
 }
@@ -49,8 +58,12 @@ export function suggestTarget(el: StateElement): string {
   if (placeholder) return `[placeholder*="${placeholder}"]`;
   const aria = pick("aria-label");
   if (aria) return `[aria-label*="${aria}"]`;
-  if (el.text && el.text.length <= 12) return `text=${el.text}`;
-  return `${el.tag}:nth-of-type(1)`;
+  const href = pick("href");
+  if (el.tag === "a" && href) return `a[href="${href}"]`;
+  const type = pick("type");
+  if (el.tag === "input" && type) return `input[type="${type}"]`;
+  // 兜底用 state 快照编号：opencli 的 click/fill 直接支持 [N]
+  return String(el.index);
 }
 
 export async function runExplore(ctx: CliContext): Promise<number> {
@@ -113,6 +126,7 @@ export async function runExplore(ctx: CliContext): Promise<number> {
   const skeleton = `# publish explore 生成的操作路径骨架（${new Date().toISOString()}）
 # 页面：${url}
 # 登录后把本文件放到 ~/.config/publish/routes/${routeId}.yaml，即可 publish -to ${routeId}
+# target 只能是 CSS 选择器或 state 快照编号（如 "3"），不支持 text= 这类语义写法
 id: ${routeId}
 name: ${routeId}
 # site: ${routeId}        # opencli 有对应 site 时启用登录检查
@@ -131,7 +145,7 @@ steps:
   - pause: [900, 2400]
   - fill: { target: "${input ? suggestTarget(input) : "textarea"}", text: "{{content}}" }
   - pause: [500, 1600]
-  - click: { target: "${button ? suggestTarget(button) : "text=发送"}" }
+  - click: { target: "${button ? suggestTarget(button) : "button"}" }
   - expect: { text: "发布成功" }
 captureUrl: true
 `;

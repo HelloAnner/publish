@@ -9,6 +9,7 @@ import {
   type RouteDefinition,
 } from "../src/adapters/route.ts";
 import { createRng } from "../src/core/random.ts";
+import { parseStateElements, suggestTarget } from "../src/cli/commands/explore.ts";
 import type { Post, RunContext } from "../src/core/types.ts";
 import { UI } from "../src/core/ui.ts";
 import { fakeRunner, ok, testConfig } from "./helpers.ts";
@@ -27,7 +28,7 @@ const RAW = {
     { open: "https://example.com/compose" },
     { wait: { selector: "textarea", timeout: 5000 } },
     { fill: { target: "textarea", text: "{{content}}" } },
-    { click: { target: "text=发送" } },
+    { click: { target: "button.submit" } },
     { expect: { text: "发布成功" } },
   ],
 };
@@ -59,6 +60,21 @@ describe("route 定义校验", () => {
     expect(() => parseRoute({ id: "x", steps: [{ teleport: 1 }] }, "/tmp/x.yaml")).toThrow();
   });
 
+  test("语义定位（text=发送）在解析阶段就被拦下并给出提示", () => {
+    expect(() => parseRoute({ id: "x", steps: [{ click: "text=发送" }] }, "/tmp/x.yaml")).toThrow(/语义定位/);
+    expect(() => parseRoute({ id: "x", steps: [{ fill: { target: "label=标题", text: "a" } }] }, "/tmp/x.yaml")).toThrow(
+      /语义定位/,
+    );
+    // 合法写法不应报错
+    expect(() => parseRoute({ id: "x", steps: [{ click: "3" }, { click: "button.submit" }] }, "/tmp/x.yaml")).not.toThrow();
+  });
+
+  test("模板变量的 target 留到运行时判断", () => {
+    const action = stepToAction({ click: { target: "{{image0}}" } }, "s", { image0: ".fab" });
+    expect(action.args).toEqual(["browser", "s", "click", ".fab"]);
+    expect(() => stepToAction({ click: { target: "{{image0}}" } }, "s", { image0: "text=发送" })).toThrow(/语义定位/);
+  });
+
   test("正常 route 解析出默认能力", () => {
     const d = def();
     expect(d.id).toBe("demo");
@@ -84,7 +100,7 @@ describe("step → opencli 参数", () => {
   test("open / eval / click / fill", () => {
     expect(stepToAction({ open: "https://a.com" }, "s", vars).args).toEqual(["browser", "s", "open", "https://a.com"]);
     expect(stepToAction({ eval: "location.href" }, "s", vars).args).toEqual(["browser", "s", "eval", "location.href"]);
-    expect(stepToAction({ click: { target: "text=发送" } }, "s", vars).args).toEqual(["browser", "s", "click", "text=发送"]);
+    expect(stepToAction({ click: { target: "button.submit" } }, "s", vars).args).toEqual(["browser", "s", "click", "button.submit"]);
     expect(stepToAction({ fill: { target: "textarea", text: "{{body}}" } }, "s", vars).args).toEqual([
       "browser",
       "s",
@@ -155,7 +171,7 @@ describe("route 适配器执行", () => {
     expect(outcome.url).toBe("https://example.com/posted/1");
     const joined = runner.args().map((a) => a.join(" "));
     expect(joined.some((j) => j.includes("fill textarea 正文内容"))).toBe(true);
-    expect(joined.some((j) => j.includes("click text=发送"))).toBe(true);
+    expect(joined.some((j) => j.includes("click button.submit"))).toBe(true);
   });
 
   test("步骤失败时返回真实错误", async () => {
@@ -166,6 +182,25 @@ describe("route 适配器执行", () => {
     const outcome = await adapter.publish(prepared, ctx);
     expect(outcome.ok).toBe(false);
     expect(outcome.error).toContain("click");
+  });
+
+  test("explore 的建议定位总是合法的（不会给出 text=）", () => {
+    const els = parseStateElements(
+      [
+        "URL: https://x.com/",
+        "---",
+        "  [1]<a href=https://a.com/x>Learn more</a>",
+        "  [2]<button>发送</button>",
+        '  [3]<input placeholder="标题" />',
+        "---",
+      ].join("\n"),
+    );
+    expect(els.map((e) => e.index)).toEqual([1, 2, 3]);
+    for (const el of els) {
+      expect(suggestTarget(el)).not.toContain("text=");
+    }
+    expect(suggestTarget(els[1]!)).toBe("2"); // 没抓到可用属性时退回快照编号
+    expect(suggestTarget(els[2]!)).toBe('[placeholder*="标题"]');
   });
 
   test("evalValue 兼容对象与裸值", () => {

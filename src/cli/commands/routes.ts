@@ -29,13 +29,16 @@ capabilities:
 #   {{topics}} 逗号分隔话题   {{hashtags}} "#a #b"   {{images}} 逗号分隔图片路径
 #   {{image0}} 第一张图       {{target}} 目标        {{id}} 内容 id
 # JSON 场景可用 {{value|json}} 做转义。
+#
+# target 只能是 CSS 选择器（如 'button.submit'、'[placeholder*="标题"]'）
+# 或 state 快照里的 [N] 编号（如 "3"）——opencli 不支持 text= 这类语义定位。
 steps:
   - open: "https://example.com/compose"
   - wait: { selector: "textarea", timeout: 20000 }
   - pause: [900, 2400]
   - fill: { target: "textarea", text: "{{content}}" }
   - pause: [500, 1600]
-  - click: { target: "text=发送" }
+  - click: { target: "button[type=submit]" }   # 换成真实选择器（用 publish explore 校对）
   - expect: { text: "发布成功" }
 # verify:
 #   selector: ".success"
