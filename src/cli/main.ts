@@ -150,6 +150,11 @@ export function applyCliOverrides(config: PublishConfig, flags: Flags): void {
   if (flags.bool("keep-tab")) config.opencli.keepTab = true;
   const binary = flags.str("opencli");
   if (binary) config.opencli.binary = binary;
+
+  const coverStyle = flags.str("cover-style");
+  if (coverStyle) config.cover.style = coverStyle;
+  const coverScale = flags.num("cover-scale");
+  if (coverScale !== undefined) config.cover.scale = coverScale > 0 ? coverScale : 1;
 }
 
 export { printHelp };

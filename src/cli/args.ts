@@ -62,6 +62,8 @@ export const FLAGS: FlagDef[] = [
   { name: "history", type: "string", metavar: "<路径>", group: "高级", help: "指定历史记录文件" },
   { name: "route-dir", type: "string", multiple: true, metavar: "<目录>", group: "高级", help: "额外 route 目录（自定义平台操作路径）" },
   { name: "cover", type: "string", metavar: "<auto|none|路径>", group: "高级", help: "无配图时自动生成封面，默认 auto" },
+  { name: "cover-style", type: "string", metavar: "<名字>", group: "高级", help: "封面样式：纸感(默认，白底黑字)/简约/科技/光影/清新/几何" },
+  { name: "cover-scale", type: "number", metavar: "<倍数>", group: "高级", help: "封面字号缩放，默认 1；0.9 更小，1.15 更大" },
   { name: "keep-tab", type: "boolean", group: "高级", help: "保留 opencli 占用的浏览器标签页" },
   { name: "limit", type: "number", metavar: "<n>", group: "高级", help: "history/platforms 等只显示最近 n 条" },
 ];

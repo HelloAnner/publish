@@ -28,7 +28,11 @@ export const DEFAULT_CONFIG: PublishConfig = {
   cover: {
     enabled: true,
     renderer: "auto",
-    style: "简约",
+    // 白底黑字的纸感封面，字号偏小、留白多
+    style: "纸感",
+    // 小红书自带的「文字配图」样式名（纸感不是它的取值之一）
+    cardStyle: "简约",
+    scale: 1,
     width: 1080,
     height: 1440,
     python: "python3",

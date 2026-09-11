@@ -117,10 +117,13 @@ export async function runPublish(ctx: CliContext): Promise<number> {
   }
 
   // ── 5. 护栏 ─────────────────────────────────────────────
-  const history = await readHistory(ctx.historyPath);
+  // dry-run 不产生任何写操作，预览不该被频率护栏挡住
+  const history = ctx.dryRun ? [] : await readHistory(ctx.historyPath);
   const plannedPerPlatform: Record<string, number> = {};
   for (const s of steps) plannedPerPlatform[s.adapter.id] = (plannedPerPlatform[s.adapter.id] ?? 0) + 1;
-  const guard = evaluateGuard({ history, platforms, plannedPerPlatform, config: config.guard });
+  const guard = ctx.dryRun
+    ? { violations: [], notes: [] }
+    : evaluateGuard({ history, platforms, plannedPerPlatform, config: config.guard });
   for (const n of guard.notes) ui.warn(n);
   if (guard.violations.length > 0) {
     ui.head("风控护栏拦截");
@@ -312,13 +315,15 @@ async function ensureCovers(ctx: CliContext, posts: Post[], adapters: PlatformAd
       .map((l) => l.trim())
       .filter((l) => l && l !== title)
       .join(" ")
-      .slice(0, 46);
+      .slice(0, 46)
+      .replace(/[。，、；：！？,.!?;:\s]+$/, "");
     const cover = await generateCover(
       ctx.run,
       {
         title: title.slice(0, 60),
         subtitle: bodyExcerpt || (post.topics.length > 0 ? post.topics.map((t) => "#" + t).join("  ") : "publish"),
         style: config.cover.style,
+        scale: config.cover.scale,
         width: config.cover.width,
         height: config.cover.height,
         python: config.cover.python,
@@ -327,7 +332,9 @@ async function ensureCovers(ctx: CliContext, posts: Post[], adapters: PlatformAd
     );
     if (cover) {
       post.images = [cover.path];
-      ui.detail(`已生成封面 ${cover.path}${cover.cached ? "（缓存）" : ""}`);
+      ui.info(
+        `  ${ui.dim("封面")} ${cover.path}${cover.cached ? ui.dim("（缓存）") : ""} ${ui.dim(`[${config.cover.style} × ${config.cover.scale}]`)}`,
+      );
     } else {
       ui.warn("封面生成失败，将退化为平台自带的文字卡片");
     }

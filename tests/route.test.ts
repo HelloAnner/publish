@@ -8,6 +8,7 @@ import {
   stepToAction,
   type RouteDefinition,
 } from "../src/adapters/route.ts";
+import { createRng } from "../src/core/random.ts";
 import type { Post, RunContext } from "../src/core/types.ts";
 import { UI } from "../src/core/ui.ts";
 import { fakeRunner, ok, testConfig } from "./helpers.ts";
@@ -113,11 +114,14 @@ describe("step → opencli 参数", () => {
     expect(stepToAction({ find: { text: "发布" } }, "s", vars).args).toEqual(["browser", "s", "find", "--text", "发布"]);
   });
 
-  test("pause 落在区间内", () => {
-    const action = stepToAction({ pause: [500, 600] }, "s", vars);
-    expect(action.kind).toBe("pause");
-    expect(action.pauseMs).toBeGreaterThanOrEqual(500);
-    expect(action.pauseMs).toBeLessThanOrEqual(600);
+  test("pause 落在区间内并叠加人类化抖动（±8%）", () => {
+    const rng = createRng(7).rng;
+    for (let i = 0; i < 50; i++) {
+      const action = stepToAction({ pause: [500, 600] }, "s", vars, rng);
+      expect(action.kind).toBe("pause");
+      expect(action.pauseMs).toBeGreaterThanOrEqual(Math.round(500 * 0.92));
+      expect(action.pauseMs).toBeLessThanOrEqual(Math.round(600 * 1.08));
+    }
   });
 });
 

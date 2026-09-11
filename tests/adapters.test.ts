@@ -114,6 +114,18 @@ describe("小红书适配器", () => {
     expect([...lenient.text].length).toBeLessThanOrEqual(1000);
   });
 
+  test("文字配图用 cover.cardStyle，而不是封面渲染样式", async () => {
+    const withStyles = ctx();
+    withStyles.config = testConfig((c) => {
+      c.cover.style = "纸感";
+      c.cover.cardStyle = "科技";
+    });
+    const prepared = await createXiaohongshuAdapter().prepare(post({ title: "标题", body: "正文" }), withStyles);
+    const joined = prepared.args.join(" ");
+    expect(joined).toContain("--card-style 科技");
+    expect(joined).not.toContain("纸感");
+  });
+
   test("没有标题会报错", async () => {
     const prepared = await createXiaohongshuAdapter().prepare(post({ body: "" }), ctx());
     expect(prepared.errors.length).toBeGreaterThan(0);

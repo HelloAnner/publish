@@ -170,7 +170,12 @@ export interface ImageConfig {
 export interface CoverConfig {
   enabled: boolean;
   renderer: "auto" | "pillow" | "card";
+  /** 封面样式：纸感(默认，白底黑字) / 简约 / 科技 / 光影 / 清新 / 几何 */
   style: string;
+  /** 小红书「文字配图」用的样式名（opencli --card-style 的取值） */
+  cardStyle: string;
+  /** 字号缩放，1 为标准，<1 更小 */
+  scale: number;
   width: number;
   height: number;
   python: string;

@@ -109,7 +109,7 @@ export function createXiaohongshuAdapter(): PlatformAdapter {
         topics,
         draft,
         cardText: title || truncateTo(body, MAX_TITLE),
-        cardStyle: ctx.config.cover.style,
+        cardStyle: ctx.config.cover.cardStyle,
       });
 
       if (draft) notes.push("将保存为草稿，不直接发布");
